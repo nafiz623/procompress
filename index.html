@@ -1,0 +1,357 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ProCompress — Image Compressor</title>
+  <!-- Tailwind Play CDN for fast single-file styling (good for prototypes & single-file apps) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Extra micro-styles to complement Tailwind for a modern polished look */
+    html,body{height:100%}
+    .glass { background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); backdrop-filter: blur(6px); }
+    .card { border: 1px solid rgba(255,255,255,0.06); }
+    /* subtle animated shimmer for progress */
+    @keyframes shimmer { 0%{background-position:-200px 0} 100%{background-position:200px 0} }
+    .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 100%); background-size: 400px 100%; animation: shimmer 1.6s linear infinite; }
+  </style>
+</head>
+<body class="bg-gradient-to-b from-slate-900 via-slate-900/60 to-slate-800 text-slate-100 min-h-screen flex items-center justify-center p-6">
+  <main class="w-full max-w-4xl">
+    <!-- Top bar / header area (no large title text as requested) -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <!-- small professional brand mark -->
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-sky-400 flex items-center justify-center shadow-lg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-white" xmlns="http://www.w3.org/2000/svg"><path d="M4 12h16M12 4v16" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="text-sm text-slate-300">ProCompress • Instant client-side image optimization</div>
+      </div>
+      <div class="text-xs text-slate-400">No server. Privacy-first. Retains original filename when possible.</div>
+    </div><!-- Main card -->
+<section class="card glass rounded-2xl p-6 shadow-2xl">
+  <div class="grid md:grid-cols-2 gap-6">
+    <!-- Left: Controls -->
+    <div>
+      <label class="block text-slate-300 text-xs mb-2">Source</label>
+
+      <div id="dropZone" class="relative cursor-pointer rounded-xl border-2 border-dashed border-slate-700 p-4 flex flex-col gap-3 items-center justify-center text-center hover:border-slate-500 transition">
+        <input id="fileInput" type="file" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+        <svg class="w-12 h-12 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5 5 5M12 5v12"/></svg>
+        <div class="text-sm text-slate-300">Drag & drop or click to choose one or more images</div>
+        <div class="text-xs text-slate-500">Supported: JPEG, PNG, WebP. Animated GIFs will be flattened.</div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-slate-300 text-xs mb-1">Target size (KB)</label>
+          <input id="targetKb" type="number" value="60" min="1" class="w-full rounded-lg p-2 bg-slate-900 border border-slate-700 text-sm" />
+        </div>
+        <div>
+          <label class="block text-slate-300 text-xs mb-1">Max dimension (px)</label>
+          <input id="maxDim" type="number" value="1600" min="64" class="w-full rounded-lg p-2 bg-slate-900 border border-slate-700 text-sm" />
+        </div>
+      </div>
+
+      <div class="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-slate-300 text-xs mb-1">Output format</label>
+          <select id="format" class="w-full rounded-lg p-2 bg-slate-900 border border-slate-700 text-sm">
+            <option value="same">Keep original</option>
+            <option value="jpeg">JPEG</option>
+            <option value="webp">WebP</option>
+            <option value="png">PNG</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-slate-300 text-xs mb-1">Quality (if applicable)</label>
+          <input id="qualityRange" type="range" min="5" max="95" value="85" class="w-full" />
+        </div>
+      </div>
+
+      <div class="mt-4 flex gap-3">
+        <button id="compressBtn" class="flex-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 transition">Compress</button>
+        <button id="downloadAllBtn" class="px-4 py-2 rounded-lg border border-slate-700">Download All</button>
+      </div>
+
+      <div class="mt-4 text-xs text-slate-400">
+        <strong>Notes:</strong>
+        <ul class="list-disc ml-4 mt-2 text-slate-500">
+          <li>Files are processed locally in your browser — nothing is uploaded.</li>
+          <li>Original filename is preserved for downloads wherever the browser permits.</li>
+          <li>For PNG files the compressor uses resizing and conversion to indexed formats where possible to reduce size.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Right: Preview and results -->
+    <div>
+      <div class="rounded-xl p-4 bg-slate-900 border border-slate-700 h-full flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-slate-300">Preview</div>
+          <div class="text-xs text-slate-500">Status: <span id="statusText">Idle</span></div>
+        </div>
+
+        <div id="previewList" class="grid gap-3 overflow-auto" style="max-height:420px"></div>
+
+        <div class="mt-2">
+          <div class="text-xs text-slate-400">Progress</div>
+          <div id="globalProgress" class="w-full h-3 rounded-lg bg-slate-800 mt-2 overflow-hidden">
+            <div id="globalBar" class="h-full w-0 shimmer"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="mt-6 text-center text-xs text-slate-500">Open this file in your browser. It runs entirely client-side. Use modern Chromium-based browsers for best filesystem integration.</div>
+
+  </main>  <script>
+  // Single-file modern compressor
+  (function(){
+    // Elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const targetKb = document.getElementById('targetKb');
+    const maxDim = document.getElementById('maxDim');
+    const format = document.getElementById('format');
+    const qualityRange = document.getElementById('qualityRange');
+    const compressBtn = document.getElementById('compressBtn');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+    const previewList = document.getElementById('previewList');
+    const statusText = document.getElementById('statusText');
+    const globalBar = document.getElementById('globalBar');
+
+    let files = [];
+    let results = [];
+
+    // Drag & drop
+    ['dragenter','dragover','dragleave','drop'].forEach(evt => {
+      dropZone.addEventListener(evt, e => e.preventDefault());
+    });
+    dropZone.addEventListener('drop', e => {
+      const dropped = Array.from(e.dataTransfer.files || []);
+      handleFiles(dropped);
+    });
+
+    fileInput.addEventListener('change', e => handleFiles(Array.from(e.target.files || [])));
+
+    function handleFiles(list){
+      const imgs = list.filter(f => f.type && f.type.startsWith('image'));
+      if(!imgs.length) return;
+      files = files.concat(imgs);
+      renderPreview();
+    }
+
+    function renderPreview(){
+      previewList.innerHTML = '';
+      files.forEach((f, i) => {
+        const el = document.createElement('div');
+        el.className = 'flex items-center gap-3 p-2 rounded-md bg-slate-800 border border-slate-700';
+        el.innerHTML = `
+          <img src="${URL.createObjectURL(f)}" class="w-16 h-16 object-cover rounded-md" />
+          <div class="flex-1 min-w-0">
+            <div class="text-sm text-white truncate">${escapeHtml(f.name)}</div>
+            <div class="text-xs text-slate-400">${formatBytes(f.size)} • ${f.type || ''}</div>
+            <div class="mt-1 text-xs text-slate-500">Max dim: ${maxDim.value}px • Target: ${targetKb.value} KB</div>
+          </div>
+          <div class="flex flex-col gap-2 items-end">
+            <button data-index="${i}" class="removeBtn text-xs text-slate-400 hover:text-red-400">Remove</button>
+          </div>
+        `;
+        previewList.appendChild(el);
+      });
+      // attach remove handlers
+      previewList.querySelectorAll('.removeBtn').forEach(btn => btn.addEventListener('click', e => {
+        const idx = Number(e.target.getAttribute('data-index'));
+        files.splice(idx,1);
+        renderPreview();
+      }));
+    }
+
+    compressBtn.addEventListener('click', async () => {
+      if(!files.length){ alert('Please add at least one image.'); return; }
+      results = [];
+      statusText.textContent = 'Compressing...';
+      globalBar.style.width = '4%';
+      for(let i=0;i<files.length;i++){
+        const f = files[i];
+        try{
+          const res = await compressImageFile(f, {
+            targetKb: Math.max(1, Number(targetKb.value) || 60),
+            maxDim: Math.max(64, Number(maxDim.value) || 1600),
+            chosenFormat: format.value,
+            quality: Number(qualityRange.value),
+            onProgress: p => { globalBar.style.width = Math.round(((i + p) / files.length) * 100) + '%'; }
+          });
+          results.push({file:f, out:res.blob, mime:res.mime, name:f.name});
+          updateListItem(i, res);
+        }catch(err){
+          console.error(err);
+          updateListItem(i, null, err);
+        }
+      }
+      statusText.textContent = 'Done';
+      globalBar.style.width = '100%';
+    });
+
+    downloadAllBtn.addEventListener('click', async () => {
+      if(!results.length){ alert('No compressed files to download. Run compression first.'); return; }
+      if('showSaveFilePicker' in window){
+        // if browser supports directory picker (experimental), ask for directory
+        try{
+          const dirHandle = await window.showDirectoryPicker();
+          for(const r of results){
+            const fileHandle = await dirHandle.getFileHandle(r.name, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(await r.out.arrayBuffer());
+            await writable.close();
+          }
+          alert('Saved to selected folder.');
+          return;
+        }catch(e){ console.warn('Directory save cancelled or failed', e); }
+      }
+      // fallback: trigger individual downloads
+      results.forEach(r => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(r.out);
+        a.download = r.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+    });
+
+    function updateListItem(index, res, err){
+      // update previewList entry with compressed info
+      const node = previewList.children[index];
+      if(!node) return;
+      const info = node.querySelector('.text-xs.text-slate-400');
+      if(err){
+        info.textContent = 'Error during compression';
+        node.querySelector('.removeBtn').textContent = 'Retry';
+        return;
+      }
+      const sizeText = res && res.blob ? formatBytes(res.blob.size) : '—';
+      node.querySelector('.text-xs.text-slate-400').textContent = `${sizeText} • ${res.mime}`;
+    }
+
+    // ---------------- Core compressor ----------------
+    async function compressImageFile(file, opts = {}){
+      const { targetKb=60, maxDim=1600, chosenFormat='same', quality=85, onProgress } = opts;
+      const targetBytes = targetKb * 1024;
+      const originalName = file.name;
+      const originalType = file.type || 'image/jpeg';
+
+      const img = await loadImageFromBlob(file);
+      let ow = img.width, oh = img.height;
+      let scale = 1;
+      const maxSide = Math.max(ow, oh);
+      if(maxSide > maxDim) scale = maxDim / maxSide;
+      let newW = Math.max(1, Math.round(ow * scale));
+      let newH = Math.max(1, Math.round(oh * scale));
+
+      // draw on canvas
+      let canvas = document.createElement('canvas');
+      canvas.width = newW; canvas.height = newH;
+      let ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, newW, newH);
+
+      // choose output mime
+      let outMime = originalType;
+      if(chosenFormat === 'jpeg') outMime = 'image/jpeg';
+      else if(chosenFormat === 'webp') outMime = 'image/webp';
+      else if(chosenFormat === 'png') outMime = 'image/png';
+      else outMime = originalType;
+
+      // PNG special handling: try to export as PNG first; if user wants extremely small size, consider converting to webp/jpeg if permitted by chosenFormat === 'same'
+      if(outMime === 'image/png'){
+        // try to reduce by lowering dimensions already done
+        const pngBlob = await canvasToBlob(canvas, 'image/png');
+        if(pngBlob.size <= targetBytes || chosenFormat === 'png'){
+          if(onProgress) onProgress(1);
+          return { blob: pngBlob, mime: 'image/png' };
+        }
+        // fallback: if user allowed 'same' we may convert to webp to reach target
+        if(chosenFormat === 'same'){
+          outMime = 'image/webp';
+        }
+      }
+
+      // For lossy formats (jpeg/webp) do a binary-search on quality
+      if(outMime === 'image/jpeg' || outMime === 'image/webp'){
+        let low = 0.05, high = Math.min(0.95, quality/100);
+        let best = null;
+        // first try with high
+        let attempt = 0;
+        while(attempt < 10){
+          const q = (low + high) / 2;
+          const blob = await canvasToBlob(canvas, outMime, q);
+          if(onProgress) onProgress(Math.min(0.9, 0.3 + attempt*0.06));
+          if(blob.size <= targetBytes){
+            best = {blob,q};
+            // try increase quality to improve visual
+            low = q;
+          } else {
+            // too large -> reduce quality
+            high = q;
+          }
+          // stop if interval tiny
+          if((high - low) < 0.01) break;
+          attempt++;
+        }
+        if(best) return { blob: best.blob, mime: outMime };
+        // if none matched, try progressively reducing resolution and repeat
+        for(let shrink=0; shrink<3; shrink++){
+          newW = Math.round(canvas.width * 0.8);
+          newH = Math.round(canvas.height * 0.8);
+          if(newW < 64 || newH < 64) break;
+          const tmp = document.createElement('canvas'); tmp.width = newW; tmp.height = newH;
+          const tctx = tmp.getContext('2d'); tctx.imageSmoothingEnabled = true; tctx.imageSmoothingQuality='high';
+          tctx.drawImage(canvas, 0,0,canvas.width,canvas.height, 0,0,newW,newH);
+          canvas = tmp;
+          // try again with low quality
+          const blobLow = await canvasToBlob(canvas, outMime, 0.05);
+          if(onProgress) onProgress(0.6 + shrink*0.1);
+          if(blobLow.size <= targetBytes) return { blob: blobLow, mime: outMime };
+        }
+        // fallback: return smallest we can
+        const fallback = await canvasToBlob(canvas, outMime, 0.05);
+        return { blob: fallback, mime: outMime };
+      }
+
+      // default fallback: export with default quality
+      const defaultBlob = await canvasToBlob(canvas, outMime, Math.min(0.92, quality/100));
+      if(onProgress) onProgress(1);
+      return { blob: defaultBlob, mime: outMime };
+    }
+
+    function loadImageFromBlob(blob){
+      return new Promise((res,rej)=>{
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = e => rej(new Error('Unable to load image'));
+        img.src = URL.createObjectURL(blob);
+      });
+    }
+
+    function canvasToBlob(canvas, mime='image/jpeg', quality=0.85){
+      return new Promise(resolve => canvas.toBlob(b => resolve(b), mime, quality));
+    }
+
+    function formatBytes(bytes){
+      if(!bytes) return '0 B';
+      const sizes = ['B','KB','MB','GB'];
+      const i = Math.floor(Math.log(bytes)/Math.log(1024));
+      return (bytes/Math.pow(1024,i)).toFixed(i?2:0) + ' ' + sizes[i];
+    }
+
+    function escapeHtml(s){ return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+  })();
+  </script></body>
+</html>
